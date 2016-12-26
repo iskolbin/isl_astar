@@ -1,3 +1,21 @@
+/* 
+ isl_astar - v1.0.0 - public domain library for graph pathfinding
+                      no warranty implied; use at your own risk
+
+ author: Ilya Kolbin (iskolbin@gmail.com)
+ url: github.com/iskolbin/isl_termbox
+
+ A* algorithm is invented by Peter Hart, Nils Nilsson and Bertram 
+ Raphael of Stanford Research Institute (now SRI International) in 1968.
+ It is an extension of Edsger Dijkstra's 1959 algorithm.
+
+ LICENSE
+
+ This software is dual-licensed to the public domain and under the following
+ license: you are granted a perpetual, irrevocable license to copy, modify,
+ publish, and distribute this file as you see fit.
+*/
+
 #ifndef ISLA_INCLUDE_ASTAR_H_
 #define ISLA_INCLUDE_ASTAR_H_
 
