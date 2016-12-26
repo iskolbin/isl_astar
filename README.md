@@ -1,3 +1,5 @@
+[![license](https://img.shields.io/badge/license-public%20domain-blue.svg)]()
+
 isl\_astar
 ==========
 Single header public domain A\* pathfinding algorithm for C. Algorithm implemented
