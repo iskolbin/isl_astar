@@ -15,7 +15,8 @@ publish, and distribute this file as you see fit.
 Author
 ------
 Ilya Kolbin, iskolbin@gmail.com, 2016
-original git url:https://github.com/iskolbin/isl\_astar
+
+original git URL: https://github.com/iskolbin/isl_astar
 
 Limitations
 -----------
@@ -51,7 +52,7 @@ Also you need to correctly allocate and initialize graph nodes. On the stack it 
 as simple as
 
 ```c
-	isla_node nodes[SIZE] = {0};
+isla_node nodes[SIZE] = {0};
 ```
 
 And finally you can actually start using pathfinding.
@@ -61,7 +62,10 @@ isla\_find\_path
 Use this function to find path between selected nodes. Prototype is
 
 ```c
-isla_result isla_find_path( isla_node *start, isla_node *finish, isla_properties *properties, void *userdata )
+isla_result isla_find_path( isla_node *start, 
+	isla_node *finish, 
+	isla_properties *properties, 
+	void *userdata )
 ```
 
 Function returns struct with fields:
@@ -78,8 +82,8 @@ Function returns struct with fields:
 isla_result result = isla_find_path( start, finish, properties, NULL );
 if ( result.status == ISLA_OK ) {
 	int i;
-	isla_reverse_path( result.path ); // Or you can change for limits
-	for ( i = 0; i < result.path->length; i-- ) {
+	isla_reverse_path( result.path ); // Or you can change for loop
+	for ( i = 0; i < result.path->length; i++ ) {
 		isla_node *node = result.path->node[i];
 		// Do your stuff
 		isla_destroy_path( result.path ); // Manually clean path
