@@ -14,7 +14,11 @@ publish, and distribute this file as you see fit.
 
 Author
 ------
-Ilya Kolbin, iskolbin@gmail.com, 2016
+Original A`* is discovered by Peter Hart, Nils Nilsson and Bertram Raphael of
+Stanford Research Institute (now SRI International) in 1968. It is an extension
+of Edsger Dijkstra's 1959 algorithm.
+
+This library source code is written by Ilya Kolbin, iskolbin@gmail.com in 2016.
 
 original git URL: https://github.com/iskolbin/isl_astar
 
