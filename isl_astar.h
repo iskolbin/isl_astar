@@ -352,6 +352,7 @@ const char *isla_strstatus( isla_status status ) {
 		"BLOCKED",
 		"ERROR_BAD_ALLOC",
 		"ERROR_BAD_REALLOC",
+		"ERROR_BAD_ARGUMENTS",
 	};
 	return statuses[status];
 }
