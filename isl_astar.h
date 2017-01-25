@@ -1,5 +1,5 @@
 /* 
- isl_astar - v1.0.0 - public domain library for graph pathfinding
+ isl_astar - v0.6.0 - public domain library for graph pathfinding
                       no warranty implied; use at your own risk
 
  author: Ilya Kolbin (iskolbin@gmail.com)
@@ -63,14 +63,9 @@ struct isla_node {
 	void *data;
 };
 
-typedef int (*isla_neighbors)( isla_node *, isla_node **, void *userdata );
+typedef isla_node *(*isla_neighbor)( isla_node *, isla_node *, void *userdata );
 typedef isla_cost (*isla_cost_fun)( isla_node *, isla_node *, void *userdata );
-
-typedef struct {
-	isla_neighbors get_neighbors;
-	isla_cost_fun neighbor_cost;
-	isla_cost_fun estimate_cost;
-} isla_properties;
+typedef int (*isla_predicate)( isla_node *, void *userdata );
 
 typedef enum {
 	ISLA_OK,
@@ -90,6 +85,15 @@ typedef struct {
 	isla_status status;
 	isla_path *path;
 } isla_result;
+
+typedef struct {
+	isla_neighbor next_neighbor;
+	isla_cost_fun eval_cost;
+	isla_cost_fun estimate_cost;
+	isla_predicate is_finish_node;
+	isla_path *cache_used;
+	isla_path *cache_open;
+} isla_properties;
 
 #ifdef __cplusplus
 extern "C" {
@@ -256,7 +260,7 @@ static void isla__heap_update( isla_path *heap, isla_node *node ) {
 // End of binary heap implementation
 
 
-static void isla__cleanup( isla_path *used, isla_path *open ) {
+static void isla__cleanup( isla_path *used, isla_path *open, int cached ) {
 	size_t i;
 	for ( i = 0; i < used->length; i++ ) {
 		isla_node *node = used->nodes[i];
@@ -266,8 +270,13 @@ static void isla__cleanup( isla_path *used, isla_path *open ) {
 		node->parent = NULL;
 		node->index = 0;
 	}
-	isla_destroy_path( used );
-	isla_destroy_path( open );
+	if ( cached ) {
+		used->length = 0;
+		open->length = 0;
+	} else {
+		isla_destroy_path( used );
+		isla_destroy_path( open );
+	}
 }
 
 static isla_result isla__build_path( isla_node *node ) {
@@ -292,13 +301,20 @@ static isla_result isla__build_path( isla_node *node ) {
 }
 
 isla_result isla_find_path( isla_node *start, isla_node *finish, isla_properties *properties, void *userdata ) {
-	isla_path *openlist = isla__path_create( ISLA_MAX_NEIGHBORS );
-	isla_path *usedlist = isla__path_create( 4 );
+	int cached = 0;
+	isla_path *openlist;
+	isla_path *usedlist;
 	isla_result result = {ISLA_OK,NULL};
 
 	if ( start == NULL || finish == NULL || properties == NULL ) {
 		result.status = ISLA_ERROR_BAD_ARGUMENTS;
+		return result;
 	}
+
+	cached = properties->cache_open != NULL && properties->cache_used != NULL;
+
+	openlist = cached ? properties->cache_open : isla__path_create( ISLA_MAX_NEIGHBORS );
+	usedlist = cached ? properties->cache_used : isla__path_create( 4 );
 
 	if ( openlist == NULL || usedlist == NULL ) {
 		isla_destroy_path( openlist );
@@ -309,7 +325,7 @@ isla_result isla_find_path( isla_node *start, isla_node *finish, isla_properties
 
 	result.status = isla__heap_enqueue( openlist, start );
 	if ( result.status != ISLA_OK ) {
-		isla__cleanup( usedlist, openlist );
+		isla__cleanup( usedlist, openlist, cached );
 		return result;
 	}
 
@@ -319,21 +335,19 @@ isla_result isla_find_path( isla_node *start, isla_node *finish, isla_properties
 	while ( openlist->length > 0 ) {
 		int i; 
 		int count;
-		isla_node *neighbors[ISLA_MAX_NEIGHBORS];
 	 	isla_node *node = isla__heap_dequeue( openlist );
+		isla_node *neighbor = NULL;
 		node->status = ISLA_NODE_CLOSED;
 
-		if ( node == finish ) {
+		if ( node == finish || (properties->is_finish_node != NULL && properties->is_finish_node( node, userdata ))) {
 			result = isla__build_path( finish );
-			isla__cleanup( usedlist, openlist );
+			isla__cleanup( usedlist, openlist, cached );
 			return result;
 		}
 
-		count = properties->get_neighbors( node, neighbors, userdata );
-		for( i = 0; i < count; i++ ) {
-			isla_node *neighbor = neighbors[i];
+		while ( (neighbor = properties->next_neighbor( node, neighbor, userdata ))) {
 			if ( neighbor->status != ISLA_NODE_CLOSED ) {
-				isla_cost g = node->g + properties->neighbor_cost( node, neighbor, userdata );
+				isla_cost g = node->g + properties->eval_cost( node, neighbor, userdata );
 				if ( neighbor->status == ISLA_NODE_DEFAULT || g < neighbor->g ) {
 					neighbor->g = g;
 					neighbor->f = g + properties->estimate_cost( node, finish, userdata );
@@ -344,12 +358,12 @@ isla_result isla_find_path( isla_node *start, isla_node *finish, isla_properties
 						neighbor->status = ISLA_NODE_OPENED;
 						result.status = isla__heap_enqueue( usedlist, neighbor );
 						if ( result.status != ISLA_OK ) {
-							isla__cleanup( usedlist, openlist );
+							isla__cleanup( usedlist, openlist, cached );
 							return result;
 						}
 						result.status = isla__path_push( openlist, neighbor );
 						if ( result.status != ISLA_OK ) {
-							isla__cleanup( usedlist, openlist );
+							isla__cleanup( usedlist, openlist, cached );
 							return result;
 						}
 					}
@@ -359,7 +373,7 @@ isla_result isla_find_path( isla_node *start, isla_node *finish, isla_properties
 	}
 
 	result.status = ISLA_BLOCKED;
-	isla__cleanup( usedlist, openlist );
+	isla__cleanup( usedlist, openlist, cached );
 
 	return result;
 }

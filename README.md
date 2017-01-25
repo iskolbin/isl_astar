@@ -27,8 +27,6 @@ original git URL: https://github.com/iskolbin/isl_astar
 Limitations
 -----------
 * Each transition from node to node must yield non-negative cost.
-* Number of neighbors is bounded by `ISL_MAX_NEIGHBORS` const (16 by default) 
-which can be redefined.
 
 Usage
 -----
@@ -44,7 +42,7 @@ Next define properties struct populated with needed functions. See complete exam
 at the end of readme.
 
 ```c
-isla_properties properties = {your_get_neighbors, your_neighbor_cost, your_estimate_cost};
+isla_properties properties = {your_next_neighbor, your_neighbor_cost, your_estimate_cost};
 isla_result result = {0}; // You will need it anyway
 ```
 
@@ -130,14 +128,14 @@ In this example we implement simple 2D grid, and find path between chosen points
 typedef struct {
 	int x;
 	int y;
-	isla_node *node; // and node->data will cross-reference to containing Cell
+	isla_node *node;
 } Cell;
 
 typedef struct {
 	int width;
 	int height;
 	Cell *cells;
-	const char **level;
+	char **level;
 } Grid;
 
 Cell *grid_get( Grid *grid, int x, int y ) {
@@ -152,64 +150,68 @@ int grid_iswalkable( Grid *grid, int x, int y ) {
 		grid->level[y][x] != '#'; 
 }
 
-void grid_add_ifwalkable( Grid *grid, int x, int y, int *count, isla_node **out ) {
-	if ( grid_iswalkable( grid, x, y )) {
-		isla_node *node = grid_get( grid, x, y )->node;
-		// Note that this check is just small optimization
-		if ( node->status != ISLA_NODE_CLOSED ) {
-			out[*count] = node;
-			*count += 1;
-		}
-	}
-}
+#define return_ifwalkable(g,x,y) if (grid_iswalkable((g),(x),(y))) return grid_get((g),(x),(y))->node;
 
-// In this example we use rectangular topology with all diagonal neighbors
-// Not that it's common when diagonal neighbor is walkable only when at least 1 orthogonal neighbor is
-int get_grid_neighbors( isla_node *node, isla_node **out, void *userdata ) {
+isla_node *next_grid_neighbor( isla_node *node, isla_node *prev, void *userdata ) {
 	Grid *grid = userdata;
-	Cell *cell = node->data;	
-	int count = 0;
+	Cell *cell = node->data;
 	int x = cell->x;
 	int y = cell->y;
-	int w = grid->width-1;
-	int h = grid->height-1;
-	grid_add_ifwalkable( grid, x-1, y, &count, out );
-	grid_add_ifwalkable( grid, x+1, y, &count, out );
-	grid_add_ifwalkable( grid, x-1, y-1, &count, out );
-	grid_add_ifwalkable( grid, x, y-1, &count, out );
-	grid_add_ifwalkable( grid, x+1, y-1, &count, out );
-	grid_add_ifwalkable( grid, x-1, y+1, &count, out );
-	grid_add_ifwalkable( grid, x, y+1, &count, out );
-	grid_add_ifwalkable( grid, x+1, y+1, &count, out );
-	return count;
+	int index = -1; 
+	if ( prev != NULL ) {
+		Cell *p = prev->data;
+		index = (p->x - x + 1) + ((p->y - y + 1)<<2);
+	}
+	switch (++index) {
+		case 0: return_ifwalkable( grid, x-1, y-1 );
+		case 1: return_ifwalkable( grid, x  , y-1 );
+		case 2: return_ifwalkable( grid, x+1, y-1 );
+		case 3: return_ifwalkable( grid, x-1, y   );
+		case 4:
+		case 5: return_ifwalkable( grid, x+1, y   );
+		case 6: return_ifwalkable( grid, x-1, y+1 );
+		case 7: return_ifwalkable( grid, x  , y+1 );
+		case 8: return_ifwalkable( grid, x+1, y+1 );
+	}
+	return NULL;
 }
 
-// For this example we use common euclidean metrics
+#include <stdio.h>
+#include <math.h>
+
 isla_cost euclidean_cost( isla_node *node1, isla_node *node2, void *data ) {
 	Cell *cell1 = node1->data;
 	Cell *cell2 = node2->data;
 	int dx = cell1->x - cell2->x;
 	int dy = cell1->y - cell2->y;
 	return sqrt( dx*dx + dy*dy );
+}	
+
+void grid_setch( Grid *grid, int x, int y, char *s, char ch ) {
+	s[y*(grid->width + 1)+x] = ch;
 }
 
-int main( int argc, char **argv ) {
-	const char *level[] = {
+int main() {
+	char *level[] = {
 		"^.........",
 		"......#...",
 		"......#...",
 		"...####...",
 		".........v"
 	};
-	isla_properties properties = { get_grid_neighbors, euclidean_cost, euclidean_cost };
 	const size_t width = 10;
 	const size_t height = sizeof( level ) / sizeof( level[0] );
+	char s[(width+1)*height];
+	isla_properties properties = { next_grid_neighbor, euclidean_cost, euclidean_cost };
 	isla_result result;
-	int x0,y0,x1,y1,row,col,i;
+
+	int i,j;
+	int x0,y0,x1,y1;
+	int row,col;
 	Cell cells[width*height] = {0};
 	isla_node nodes[width*height] = {0};
 	Grid grid = {width,height,cells,level};
-
+	fprintf(stderr,"%zu,%zu", width, height );
 	for ( row = 0; row < height; row++ ) {
 		for ( col = 0; col < width; col++ ) {
 			int idx = row*width + col;
@@ -217,6 +219,7 @@ int main( int argc, char **argv ) {
 			cells[idx].y = row;
 			cells[idx].node = nodes + idx;
 			cells[idx].node->data = cells + idx;
+		
 			if (level[row][col] == '^') {
 				x0 = col;
 				y0 = row;
@@ -226,20 +229,27 @@ int main( int argc, char **argv ) {
 			}
 		}
 	}
+	
+	for ( row = 0; row < height; row++ ) {
+		for ( col = 0; col < width; col++ ) {
+			grid_setch( &grid, col, row, s, level[row][col] );
+		}
+		grid_setch( &grid, width, row, s, '\n' );
+	}
+	grid_setch( &grid, width, height-1, s, '\0' );
 
 	result = isla_find_path( grid_get(&grid,x0,y0)->node, grid_get(&grid,x1,y1)->node, &properties, (void *) &grid); 
 	printf( "%s\n", isla_strstatus( result.status ));
-
 	if ( result.status == ISLA_OK ) {
 		for ( i = 0; i < result.path->length; i++ ) {
 			Cell *cell = result.path->nodes[i]->data;
-			printf( "(%d,%d)", cell.x, cell.y );
+			grid_setch( &grid, cell->x, cell->y, s, '@' );
 		}
-
-		// You have to release memory only when anything is OK
-		// If path is blocked/memory error accured all cleanups will be run automatically
 		isla_destroy_path( result.path );
 	}
+	grid_setch( &grid, x0, y0, s, '^' );
+	grid_setch( &grid, x1, y1, s, 'v' );
+	printf("%s\n", s);	
 	return 0;
 }
 ```
