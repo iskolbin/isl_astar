@@ -122,8 +122,11 @@ Example
 In this example we implement simple 2D grid, and find path between chosen points.
 
 ```c
-#define ISL_ASTAR_IMPLEMENTATION 
+#define ISL_ASTAR_IMPLEMENTATION
 #include "isl_astar.h"
+
+#include <stdio.h>
+#include <math.h>
 
 typedef struct {
 	int x;
@@ -143,11 +146,7 @@ Cell *grid_get( Grid *grid, int x, int y ) {
 }
 
 int grid_iswalkable( Grid *grid, int x, int y ) {
-	return x >= 0 &&
-		x < grid->width &&
-		y >= 0 &&
-		y < grid->height &&
-		grid->level[y][x] != '#'; 
+	return x >= 0 && x < grid->width && y >= 0 && y < grid->height && grid->level[y][x] != '#';
 }
 
 #define return_ifwalkable(g,x,y) if (grid_iswalkable((g),(x),(y))) return grid_get((g),(x),(y))->node;
@@ -175,9 +174,6 @@ isla_node *next_grid_neighbor( isla_node *node, isla_node *prev, void *userdata 
 	}
 	return NULL;
 }
-
-#include <stdio.h>
-#include <math.h>
 
 isla_cost euclidean_cost( isla_node *node1, isla_node *node2, void *data ) {
 	Cell *cell1 = node1->data;
@@ -219,7 +215,7 @@ int main() {
 			cells[idx].y = row;
 			cells[idx].node = nodes + idx;
 			cells[idx].node->data = cells + idx;
-		
+
 			if (level[row][col] == '^') {
 				x0 = col;
 				y0 = row;
@@ -229,7 +225,7 @@ int main() {
 			}
 		}
 	}
-	
+
 	for ( row = 0; row < height; row++ ) {
 		for ( col = 0; col < width; col++ ) {
 			grid_setch( &grid, col, row, s, level[row][col] );
@@ -249,7 +245,7 @@ int main() {
 	}
 	grid_setch( &grid, x0, y0, s, '^' );
 	grid_setch( &grid, x1, y1, s, 'v' );
-	printf("%s\n", s);	
+	printf("%s\n", s);
 	return 0;
 }
 ```
